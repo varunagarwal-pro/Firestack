@@ -329,7 +329,6 @@ func (w *wgproxy) onNotOK() (didRefresh, allok bool) {
 	// TODO: skip on s == TUP?
 	if w.tooyoung() {
 		log.VV("proxy: wg: %s onNotOK: too young; status %s", w.tag(), pxstatus(s))
-		return
 	}
 
 	var didPing, hasVia, viaDidRefresh, viaOK bool
@@ -383,8 +382,7 @@ func (w *wgproxy) Refresh() (err error) {
 
 	// TODO: skip on s == TUP?
 	if w.tooyoung() {
-		log.VV("proxy: wg: %s refresh skipped; too young; status(%s)", w.tag(), pxstatus(status))
-		return // TODO: err?
+		log.VV("proxy: wg: %s refreshing... too young; status(%s)", w.tag(), pxstatus(status))
 	}
 
 	now := now()
@@ -1460,6 +1458,42 @@ func (h *wgproxy) Reaches(hostportOrIPPortCsv string) bool {
 	return Reaches(h, hostportOrIPPortCsv)
 }
 
+// Next implements x.Router.
+func (h *wgproxy) Next(who, ippOrCidr string) (route string, err error) {
+	dst, err := core.IP2Cidr2(ippOrCidr)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		log.V("wg: %s router: (%s) next for %s is %s", h.tag(), who, ippOrCidr, route)
+	}()
+
+	ip := dst.Addr()
+	if ip.Is4() && !h.IP4() || ip.Is6() && !h.IP6() {
+		return "", syscall.EHOSTUNREACH
+	}
+	if h.rt == nil {
+		return "", syscall.EHOSTUNREACH
+	}
+
+	rv, err := h.rt.GetAny(ip.String())
+	if err != nil {
+		return "", err
+	}
+	r, _, ok := strings.Cut(rv, x.Kdelim)
+	if !ok {
+		return "", errNoSuchHost
+	}
+	best, err := netip.ParsePrefix(r)
+	if err != nil {
+		return "", err
+	}
+	if !best.IsValid() {
+		return "", errInvalidAddr
+	}
+	return best.String(), nil
+}
+
 // Hop implements Proxy.
 func (h *wgproxy) Hop(via *core.WeakRef[Proxy], dryrun bool) (err error) {
 	var viaPx Proxy
@@ -1961,7 +1995,7 @@ func (w *wgtun) maybeResetMtu(via Proxy, dryrun bool) error {
 	} // else: mtu needed is well within the hop's / network's capacity
 
 	if mtuAvailable < minmtu {
-		return log.EE("wg: (4? %t / 6? %t) %s proxy: hopping? %t %s; needs1 %d; avail(%d) < min(%d); %v",
+		return log.EE("wg:  %s (4? %t / 6? %t) proxy: hopping? %t %s; needs1 %d; avail(%d) < min(%d); %v",
 			w.tag(), has4, has6, hopping, viaid, mtuNeededByUs, mtuAvailable, minmtu, errHopMtuInsufficient)
 	}
 
