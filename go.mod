@@ -2,6 +2,11 @@ module github.com/celzero/firestack
 
 go 1.27.3
 
+tool (
+	golang.org/x/mobile/cmd/gobind
+	golang.org/x/mobile/cmd/gomobile
+)
+
 require (
 	github.com/celzero/gotrie v0.0.0-20250314130138-a2756ab2f6bd
 	github.com/cloudflare/odoh-go v1.0.0

@@ -2,13 +2,21 @@ name: AAARRR
 
 on:
   push:
-    branches: [ n2 ]
+    branches: [ n2, streamshield ]
     paths:
       - '**/*.go'
+      - 'Makefile'
+      - 'make-aar'
+      - 'go.mod'
+      - '.github/workflows/go.yml'
   pull_request:
-    branches: [ n2 ]
+    branches: [ n2, streamshield ]
     paths:
       - '**/*.go'
+      - 'Makefile'
+      - 'make-aar'
+      - 'go.mod'
+      - '.github/workflows/go.yml'
   workflow_dispatch:
 
 jobs:
@@ -77,6 +85,21 @@ jobs:
         retention-days: 52 # 0-90; 90 is max
         if-no-files-found: error # error, warn (default), ignore
         compression-level: 9 # 0-9; 9 is max
+
+    - name: 📦 Publish GitHub Release (streamshield branch)
+      if: ${{ github.ref == 'refs/heads/streamshield' && steps.test.outcome == 'success' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        VCSVER="${GITHUB_SHA:0:10}"
+        TAG="v${VCSVER}"
+        echo "Releasing Firestack Sovereign AAR for tag: ${TAG}"
+        gh release create "${TAG}" firestack.aar firestack-sources.jar firestack-debug-symbols.zip \
+          --target "${GITHUB_SHA}" \
+          --title "StreamShield Firestack ${TAG}" \
+          --notes "StreamShield Sovereign Firestack AAR (Commit: ${GITHUB_SHA}) with 10 sovereign video stall, proxy timeout, and TCP keepalive fixes." || \
+        gh release upload "${TAG}" firestack.aar firestack-sources.jar firestack-debug-symbols.zip --clobber
+      shell: bash
 
     # github.com/microsoft/sbom-tool
     # github.com/microsoft/sbom-tool/blob/f5f65011f2/docs/sbom-tool-arguments.md
@@ -341,7 +364,7 @@ jobs:
   attestation:
     name: 🪪 Artifact attestations
     needs: build
-    if: ${{ needs.build.result == 'success' && needs.build.outputs.artifact-subjects != '' && needs.build.outputs.publish == 'true' }}
+    if: ${{ github.repository_owner == 'celzero' && needs.build.result == 'success' && needs.build.outputs.artifact-subjects != '' && needs.build.outputs.publish == 'true' }}
     uses: ./.github/workflows/provenance.yml
     with:
       subjects: ${{ needs.build.outputs.artifact-subjects }}
@@ -352,7 +375,7 @@ jobs:
     needs:
       - build
       - attestation
-    if: ${{ needs.build.result == 'success' && needs.attestation.result == 'success' && needs.build.outputs.publish == 'true' }}
+    if: ${{ github.repository_owner == 'celzero' && needs.build.result == 'success' && needs.attestation.result == 'success' && needs.build.outputs.publish == 'true' }}
     uses: ./.github/workflows/publish.yml
     with:
       run_id: ${{ github.run_id }}
