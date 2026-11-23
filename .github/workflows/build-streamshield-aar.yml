@@ -26,18 +26,8 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
 
-      - name: 📱 Setup Android SDK & NDK
-        uses: android-actions/setup-android@v3
-
-      - name: 🛠️ Install Android NDK
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
-
       - name: 🚀 Compile AAR via make-aar
         run: |
-          export ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/27.2.12479018"
-          export ANDROID_NDK_ROOT="${ANDROID_NDK_HOME}"
           ./make-aar nogo debug
         shell: bash
 
